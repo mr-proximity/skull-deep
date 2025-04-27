@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Skeletal System</title>
+    <style>
+        :root {
+            --glow-color: #00a2ff;
+            --header-height: 45px;
+            --sidebar-width: 350px;
+        }
+
+        body {
+            background-color: #000;
+            background-image:
+                linear-gradient(to right, rgba(0, 162, 255, 0.3) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0, 162, 255, 0.3) 1px, transparent 1px);
+            background-size: 20px 20px;
+            margin: 0;
+            font-family: Calibri, Candara, Segoe, "Segoe UI", Optima, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: var(--header-height);
+            background-color: #000;
+            color: #eee;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-sizing: border-box;
+            z-index: 5000;
+            border-bottom: 1px solid #222;
+        }
+
+        .header-title {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--glow-color);
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+
+        .header-title:hover {
+            text-shadow: 0 0 8px var(--glow-color);
+        }
+
+        nav.center-nav a,
+        nav.right-nav a {
+            color: #ccc;
+            text-decoration: none;
+            margin: 0 12px;
+            font-size: 0.9em;
+            transition: color 0.2s ease, text-shadow 0.2s ease;
+            cursor: pointer;
+        }
+
+        nav.center-nav a:hover,
+        nav.right-nav a:hover {
+            color: #fff;
+            text-shadow: 0 0 8px var(--glow-color);
+        }
+
+        .main-content {
+            margin-top: var(--header-height);
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .container {
+            position: relative;
+            margin: 20px;
+            cursor: default;
+            transition: transform 0.5s ease-in-out;
+            max-width: calc(100vw - var(--sidebar-width) - 60px);
+            max-height: calc(100vh - var(--header-height) - 40px);
+            flex-shrink: 0;
+        }
+
+        .container img.anatomy-layer {
+             max-width: 100%;
+             max-height: 100%;
+             width: auto;
+             height: auto;
+         }
+
+        .anatomy-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-drag: none;
+            transition: filter 0.15s ease-in-out, opacity 0.3s ease-in-out;
+            opacity: 1;
+        }
+
+        .anatomy-layer.hidden {
+             opacity: 0;
+             pointer-events: none;
+         }
+
+        .hit-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            visibility: hidden;
+        }
+
+        .glowing {
+            filter: drop-shadow(0 0 15px var(--glow-color));
+        }
+
+        #loading {
+            color: white;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5em;
+            z-index: 10000;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px 30px;
+            border-radius: 8px;
+            text-align: center;
+        }
+         #loading progress {
+             width: 80%;
+             margin-top: 10px;
+         }
+
+        #sidebar {
+            position: fixed;
+            right: 0;
+            top: var(--header-height);
+            width: var(--sidebar-width);
+            height: calc(100vh - var(--header-height));
+            background-color: rgba(15, 15, 15, 0.98);
+            color: #eee;
+            border-left: 1px solid #333;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.5);
+            z-index: 4000;
+            transform: translateX(100%);
+            transition: transform 0.4s ease-in-out;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #sidebar.visible {
+            transform: translateX(0);
+        }
+
+        .sidebar-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header h4 {
+            margin: 0;
+            color: var(--glow-color);
+            font-size: 1.3em;
+        }
+
+        .sidebar-close-btn {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 1.8em;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 5px;
+            transition: color 0.2s ease;
+        }
+
+        .sidebar-close-btn:hover {
+            color: #fff;
+        }
+
+        .sidebar-content {
+            padding: 20px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .sidebar-content img.popup-gif,
+        .sidebar-content img.popup-image {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            background-color: #222;
+        }
+
+        .sidebar-content h5 {
+             color: #bbb;
+             margin-top: 20px;
+             margin-bottom: 8px;
+             border-bottom: 1px solid #333;
+             padding-bottom: 4px;
+         }
+
+         .sidebar-content p {
+             font-size: 0.95em;
+             line-height: 1.6;
+             margin-bottom: 15px;
+             color: #ccc;
+         }
+          .sidebar-content a {
+             color: var(--glow-color);
+             text-decoration: none;
+         }
+         .sidebar-content a:hover {
+             text-decoration: underline;
+         }
+         .sidebar-content ul {
+             list-style: none;
+             padding-left: 0;
+         }
+         .sidebar-content li {
+              margin-bottom: 8px;
+              font-size: 0.9em;
+              color: #bbb;
+          }
+           .sidebar-content .credits {
+               margin-top: 30px;
+               padding-top: 15px;
+               border-top: 1px solid #333;
+               font-size: 0.8em;
+               color: #888;
+           }
+           .sidebar-content .credits h5 {
+               color: #aaa;
+               margin-bottom: 10px;
+           }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-title" id="header-title">SKELETAL SYSTEM</div>
+        <nav class="center-nav">
+            <a href="#" data-mode="arthritis">Arthritis</a>
+            <a href="#" data-mode="osteoporosis">Osteoporosis</a>
+            <a href="#" data-mode="osteomyelitis">Osteomyelitis</a>
+            <a href="#" data-mode="scoliosis">Scoliosis</a>
+            <a href="#" data-mode="rickets">Rickets</a>
+        </nav>
+        <nav class="right-nav">
+            <a href="https://ashish102005.github.io/kurkure/" target="_blank" rel="noopener noreferrer">Take a Quiz</a>
+            <a href="#" data-mode="about">About</a>
+        </nav>
+    </header>
+
+    <div class="main-content">
+        <div class="container" id="container">
+            </div>
+    </div>
+
+    <div id="sidebar">
+        <div class="sidebar-header">
+            <h4 id="sidebar-title">Information</h4>
+            <button class="sidebar-close-btn" id="sidebar-close-btn" aria-label="Close sidebar">&times;</button>
+        </div>
+        <div class="sidebar-content" id="sidebar-content">
+            </div>
+    </div>
+
+    <div id="loading">
+         Loading Assets...
+         <progress id="loading-progress" value="0" max="100"></progress>
+     </div>
+
+    <script>
+        const BASE_LAYER_ID = 'base';
+
+        const skeletonLayers = [
+             { id: 'skull', src: 'skull.png', name: 'Skull', interactive: true, gifSrc: 'skull.gif', info: 'The skull protects the brain and provides structure to the face. Made up of 22 bones, it is divided into the cranium (braincase) and facial bones.' },
+             { id: 'spine', src: 'spine.png', name: 'Spine', interactive: true, gifSrc: 'spine.gif', info: 'The spine, or vertebral column, consists of 33 vertebrae. It supports the body, allows movement, and protects the spinal cord.' },
+             { id: 'ribcage', src: 'ribcage.png', name: 'Ribcage', interactive: true, gifSrc: 'ribcage.gif', info: 'Typically consisting of 12 pairs of ribs, the sternum, and thoracic vertebrae, the ribcage protects vital organs like the heart and lungs.' },
+             { id: 'pelvis', src: 'pelvis.png', name: 'Pelvis', interactive: true, gifSrc: 'pelvis.gif', info: 'The pelvis connects the spine to the legs and supports abdominal organs. It is formed by the hip bones, sacrum, and coccyx.' },
+             { id: 'right-arm', src: 'right-arm.png', name: 'Right Arm Bones', interactive: true, gifSrc: 'arm.gif', info: 'Includes the humerus (upper arm), and the radius and ulna (forearm). These bones facilitate a wide range of movements.' },
+             { id: 'left-arm', src: 'left-arm.png', name: 'Left Arm Bones', interactive: true, gifSrc: 'arm.gif', info: 'Includes the humerus (upper arm), and the radius and ulna (forearm). Structurally similar to the right arm.' },
+             { id: 'hands', src: 'hands.png', name: 'Hand Bones', interactive: true, gifSrc: 'hands.gif', info: 'Each hand has 27 bones: carpals (wrist), metacarpals (palm), and phalanges (fingers), allowing for dexterity.' },
+             { id: 'thighs', src: 'thighs.png', name: 'Thigh Bone (Femur)', interactive: true, gifSrc: 'femur.gif', info: 'The femur is the longest, heaviest, and strongest bone in the human body, connecting the hip to the knee.' },
+             { id: 'lower-leg', src: 'lower-leg.png', name: 'Lower Leg Bones', interactive: true, gifSrc: 'tibia.gif', info: 'Comprises the tibia (shin bone), which bears most of the weight, and the fibula. They connect the knee to the ankle.' },
+             { id: 'feet', src: 'feet.png', name: 'Foot Bones', interactive: true, gifSrc: 'feet.gif', info: 'Each foot contains 26 bones: tarsals (ankle), metatarsals (midfoot), and phalanges (toes), providing support and enabling locomotion.' }
+        ];
+
+         const diseaseInfo = {
+             arthritis: {
+                 name: 'Arthritis',
+                 baseImage: 'arthritis-test.png',
+                 extraLayers: [{ id: 'arthritis-hand', src: 'arthritis-hand.png', zIndex: 1000 }],
+                 popupImage: 'arthritis-popj.jpeg',
+                 info: 'Arthritis is the swelling and tenderness of one or more joints. The main symptoms are joint pain and stiffness, which typically worsen with age. Common types include osteoarthritis and rheumatoid arthritis. <br><br> Treatments vary depending on the type but may include medications, physical therapy, or surgery. Lifestyle changes can also help manage symptoms.',
+                 links: [{ text: 'More on Arthritis (Mayo Clinic)', url: 'https://www.mayoclinic.org/diseases-conditions/arthritis/symptoms-causes/syc-20350772' }]
+             },
+             osteoporosis: {
+                 name: 'Osteoporosis',
+                 baseImage: 'osteoporosis-test.png',
+                 extraLayers: [{ id: 'osteoporosis-arm', src: 'osteoporosis-arm.png', zIndex: 1000 }],
+                 popupImage: 'osteoporosis-pop.jpeg',
+                 info: 'Osteoporosis causes bones to become weak and brittle — so brittle that a fall or even mild stresses such as bending over or coughing can cause a fracture. Osteoporosis-related fractures most commonly occur in the hip, wrist or spine.<br><br>Treatment includes medication, healthy diet, and weight-bearing exercise to help prevent bone loss or strengthen already weak bones.',
+                 links: [{ text: 'Osteoporosis Overview (NIH)', url: 'https://www.niams.nih.gov/health-topics/osteoporosis' }]
+             },
+             osteomyelitis: {
+                 name: 'Osteomyelitis',
+                 baseImage: 'test.png',
+                 extraLayers: [{ id: 'osteomyelitis-arm', src: 'osteomyelitis-arm.png', zIndex: 1000 }],
+                 popupImage: 'osteomyelitis-pop.png',
+                 info: 'Osteomyelitis is an infection in a bone. Infections can reach a bone by traveling through the bloodstream or spreading from nearby tissue. Infections can also begin in the bone itself if an injury exposes the bone to germs.<br><br>Treatment often involves surgery to remove parts of the bone that have died, followed by strong antibiotics, often intravenously.',
+                 links: [{ text: 'Learn about Osteomyelitis (MSD Manual)', url: 'https://www.msdmanuals.com/home/bone,-joint,-and-muscle-disorders/bone-infections/osteomyelitis' }]
+             },
+             scoliosis: {
+                 name: 'Scoliosis',
+                 baseImage: 'scoliosis2.png',
+                 extraLayers: [],
+                 popupImage: 'scoliosis-popj.jpeg',
+                 info: 'Scoliosis is a sideways curvature of the spine that most often is diagnosed in adolescents. While scoliosis can occur in people with conditions such as cerebral palsy and muscular dystrophy, the cause of most childhood scoliosis is unknown.<br><br>Treatment depends on the severity of the curve. Options include observation, bracing, or surgery.',
+                 links: [{ text: 'Scoliosis Information (SRS)', url: 'https://www.srs.org/patients-and-families/conditions-and-treatments/parents/scoliosis' }]
+             },
+             rickets: {
+                 name: 'Rickets',
+                 baseImage: 'rickets-test.png',
+                 extraLayers: [{ id: 'rickets-layer', src: 'rickets.png', zIndex: 1000 }],
+                 popupImage: 'rickets-popj.jpeg',
+                 info: 'Rickets is the softening and weakening of bones in children, usually because of an extreme and prolonged vitamin D deficiency. Adding vitamin D or calcium to the diet generally corrects the bone problems associated with rickets.<br><br>Rare inherited problems also can cause rickets. For these, specific medications or other management might be needed.',
+                 links: [{ text: 'Rickets Explained (KidsHealth)', url: 'https://kidshealth.org/en/parents/rickets.html' }]
+             },
+             about: {
+                 name: 'About This Project',
+                 baseImage: null,
+                 extraLayers: [],
+                 popupImage: null,
+                 info: `<h5>Skeletal System as Scaffold</h5>
+                    <p>This interactive tool explores the human skeletal system, the vital framework that supports our bodies, protects our organs, and enables movement. Explore different bones and learn about common conditions affecting skeletal health.</p>
+                    <div class="credits">
+                        <h5>Project Credits</h5>
+                        <ul>
+                            <li>10484 - Ashish Kori</li>
+                            <li>10483 - Samruddhi Khapare</li>
+                            <li>10474 - Darshan Bhoir</li>
+                            <li>10476 - Jayesh Devlekar</li>
+                            <li>10477 - Paras Dhende</li>
+                            <li>10479 - Manomay Ghadi</li>
+                            <li>10480 - Isha Madhialagan</li>
+                            <li>10482 - Sayli Kargutkar</li>
+                            <li>10478 - Jess Demello</li>
+                            <li>10481 - Abhinav Jha</li>
+                            <li>10475 - Luke Cabral</li>
+                        </ul>
+                    </div>`
+             }
+         };
+
+        const container = document.getElementById('container');
+        const loadingIndicator = document.getElementById('loading');
+        const loadingProgress = document.getElementById('loading-progress');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarTitle = document.getElementById('sidebar-title');
+        const sidebarContent = document.getElementById('sidebar-content');
+        const sidebarCloseBtn = document.getElementById('sidebar-close-btn');
+        const header = document.querySelector('header');
+        const headerTitle = document.getElementById('header-title');
+
+        const imageElements = {};
+        const canvasElements = {};
+        const canvasContexts = {};
+        let assetsToLoad = 0;
+        let assetsLoaded = 0;
+        let activeLayerId = null;
+        let currentMode = 'default';
+        let baseImageNaturalWidth = 0;
+        let baseImageNaturalHeight = 0;
+
+        function init() {
+            console.log("Initializing...");
+            setupHeaderListeners();
+            sidebarCloseBtn.addEventListener('click', closeSidebar);
+
+            headerTitle.addEventListener('click', () => {
+                window.location.reload();
+            });
+
+            const imageUrls = new Set();
+            imageUrls.add('test.png');
+            skeletonLayers.forEach(l => imageUrls.add(l.src));
+            Object.values(diseaseInfo).forEach(d => {
+                if (d.baseImage) imageUrls.add(d.baseImage);
+                if (d.popupImage) imageUrls.add(d.popupImage);
+                d.extraLayers.forEach(el => imageUrls.add(el.src));
+            });
+            skeletonLayers.forEach(l => { if (l.gifSrc) imageUrls.add(l.gifSrc); });
+
+            assetsToLoad = imageUrls.size;
+            console.log(`Need to load ${assetsToLoad} assets.`);
+            loadingProgress.max = assetsToLoad;
+
+            if (assetsToLoad === 0) {
+                setupScene();
+                return;
+            }
+
+            createLayerElement({ id: BASE_LAYER_ID, src: 'test.png', name: 'Base Body', interactive: false, zIndex: 0 });
+
+            skeletonLayers.forEach((layer, index) => {
+                createLayerElement({ ...layer, zIndex: index + 1 });
+            });
+
+            Object.values(diseaseInfo).forEach(disease => {
+                disease.extraLayers.forEach(layerInfo => {
+                    createLayerElement({ ...layerInfo, interactive: false, initiallyHidden: true });
+                });
+            });
+
+            imageUrls.forEach(url => preloadImage(url));
+        }
+
+        function createLayerElement(layerData) {
+            const img = new Image();
+            img.className = 'anatomy-layer';
+            img.id = `${layerData.id}-layer`;
+            img.alt = layerData.name || layerData.id;
+            img.style.zIndex = layerData.zIndex === undefined ? 1 : layerData.zIndex;
+            if (layerData.initiallyHidden) {
+                img.classList.add('hidden');
+            }
+            imageElements[layerData.id] = img;
+            container.appendChild(img);
+
+            if (layerData.interactive && layerData.id !== BASE_LAYER_ID) {
+                const canvas = document.createElement('canvas');
+                canvas.className = 'hit-canvas';
+                canvas.id = `${layerData.id}-canvas`;
+                canvas.style.zIndex = (layerData.zIndex || 1) + 100;
+                canvasElements[layerData.id] = canvas;
+                container.appendChild(canvas);
+            }
+        }
+
+        function preloadImage(url) {
+            const img = new Image();
+            img.onload = () => assetLoadHandler(url);
+            img.onerror = () => assetErrorHandler(url);
+            img.src = url;
+        }
+
+        function assetLoadHandler(url) {
+            console.log(`Loaded: ${url}`);
+            assetsLoaded++;
+            updateLoadingProgress();
+            checkAllAssetsLoaded();
+        }
+
+        function assetErrorHandler(url) {
+            showError(`Failed to load asset: ${url}`, false);
+            console.error(`Failed to load asset: ${url}`);
+            assetsLoaded++;
+            updateLoadingProgress();
+            checkAllAssetsLoaded();
+        }
+
+        function updateLoadingProgress() {
+            loadingProgress.value = assetsLoaded;
+            if (loadingIndicator.style.display !== 'none') {
+                loadingIndicator.firstChild.textContent = ` Loading Assets... (${assetsLoaded}/${assetsToLoad}) `;
+            }
+        }
+
+        function checkAllAssetsLoaded() {
+            if (assetsLoaded === assetsToLoad) {
+                console.log("All assets processed. Setting up scene.");
+                imageElements[BASE_LAYER_ID].src = 'test.png';
+                skeletonLayers.forEach(layer => {
+                    if (imageElements[layer.id]) imageElements[layer.id].src = layer.src;
+                });
+                Object.values(diseaseInfo).forEach(disease => {
+                    disease.extraLayers.forEach(layerInfo => {
+                        if (imageElements[layerInfo.id]) imageElements[layerInfo.id].src = layerInfo.src;
+                    });
+                });
+                setTimeout(setupScene, 100);
+            }
+        }
+
+        function setupScene() {
+            console.log("Setting up scene...");
+            const baseImg = imageElements[BASE_LAYER_ID];
+
+            if (!baseImg || !baseImg.complete || baseImg.naturalWidth === 0) {
+                showError("Base image missing or invalid after loading. Cannot initialize.", true);
+                return;
+            }
+
+            baseImageNaturalWidth = baseImg.naturalWidth;
+            baseImageNaturalHeight = baseImg.naturalHeight;
+
+            container.style.width = baseImageNaturalWidth + 'px';
+            container.style.height = baseImageNaturalHeight + 'px';
+
+            let initializationSuccess = true;
+
+            skeletonLayers.forEach(layer => {
+                if (!layer.interactive) return;
+
+                const img = imageElements[layer.id];
+                const canvas = canvasElements[layer.id];
+
+                if (!img || !canvas || !img.complete || img.naturalWidth === 0) {
+                    console.warn(`Skipping canvas setup for ${layer.id} due to image issues.`);
+                    return;
+                }
+
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                if (!ctx) {
+                    console.error(`Could not get 2D context for ${layer.id}`);
+                    initializationSuccess = false;
+                    return;
+                }
+                try {
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    canvasContexts[layer.id] = ctx;
+                } catch (e) {
+                    console.error(`Error drawing image to canvas for ${layer.id}:`, e);
+                    initializationSuccess = false;
+                }
+            });
+
+            if(initializationSuccess) {
+                container.addEventListener('mousemove', handleContainerMouseMove);
+                container.addEventListener('mouseleave', handleContainerMouseLeave);
+                container.addEventListener('click', handleContainerClick);
+                loadingIndicator.style.display = 'none';
+                console.log("Initialization complete.");
+            } else {
+                showError("Initialization failed for some layers. Interaction may be incomplete.", true);
+            }
+        }
+
+        function setupHeaderListeners() {
+            header.addEventListener('click', (e) => {
+                if (e.target.tagName === 'A' && e.target.dataset.mode) {
+                    e.preventDefault();
+                    const mode = e.target.dataset.mode;
+                    if (mode === 'about' && sidebar.classList.contains('visible') && currentMode === 'about') {
+                        closeSidebar();
+                    } else {
+                        setMode(mode);
+                    }
+                }
+            });
+        }
+
+        function setMode(mode) {
+            console.log(`Setting mode to: ${mode}`);
+            handleContainerMouseLeave();
+
+            currentMode = mode;
+
+            Object.values(diseaseInfo).forEach(d => {
+                d.extraLayers.forEach(l => {
+                    if (imageElements[l.id]) imageElements[l.id].classList.add('hidden');
+                });
+            });
+
+            const info = diseaseInfo[mode];
+            const baseImgElement = imageElements[BASE_LAYER_ID];
+
+            if (mode === 'default') {
+                baseImgElement.src = 'test.png';
+                skeletonLayers.forEach(l => {
+                    if(imageElements[l.id]) imageElements[l.id].classList.remove('hidden');
+                });
+                closeSidebar();
+            } else if (info) {
+                if (info.baseImage) {
+                    baseImgElement.src = info.baseImage;
+                } else {
+                    baseImgElement.src = 'test.png';
+                }
+
+                skeletonLayers.forEach(l => {
+                    if(imageElements[l.id]) imageElements[l.id].classList.remove('hidden');
+                });
+
+                info.extraLayers.forEach(l => {
+                    if (imageElements[l.id]) imageElements[l.id].classList.remove('hidden');
+                });
+
+                showSidebar(info);
+            } else {
+                console.warn(`Unknown mode: ${mode}`);
+                setMode('default');
+            }
+
+            const currentBaseSrc = baseImgElement.src;
+            const tempImg = new Image();
+            tempImg.onload = () => {
+                container.style.width = tempImg.naturalWidth + 'px';
+                container.style.height = tempImg.naturalHeight + 'px';
+                console.log(`Container resized for ${currentMode} base image.`);
+            };
+            tempImg.src = currentBaseSrc;
+        }
+
+        function showSidebar(data) {
+            if (!data) return;
+
+            sidebarTitle.textContent = data.name || 'Details';
+            let contentHTML = '';
+
+            const imageSrc = data.popupImage || (data.gifSrc);
+            if (imageSrc) {
+                contentHTML += `<img src="${imageSrc}" alt="${data.name}" class="${data.popupImage ? 'popup-image' : 'popup-gif'}">`;
+            }
+
+            contentHTML += `<div>${data.info || 'No information available.'}</div>`;
+
+            if (data.links && data.links.length > 0) {
+                contentHTML += `<h5>Learn More:</h5><ul>`;
+                data.links.forEach(link => {
+                    contentHTML += `<li><a href="${link.url}" target="_blank" rel="noopener noreferrer">${link.text}</a></li>`;
+                });
+                contentHTML += `</ul>`;
+            }
+
+            sidebarContent.innerHTML = contentHTML;
+            sidebar.classList.add('visible');
+        }
+
+        function closeSidebar() {
+            sidebar.classList.remove('visible');
+        }
+
+        function handleContainerMouseMove(event) {
+            if (currentMode !== 'default') {
+                handleContainerMouseLeave();
+                return;
+            }
+
+            let foundLayerId = null;
+            for (let i = skeletonLayers.length - 1; i >= 0; i--) {
+                const layer = skeletonLayers[i];
+                if (layer.interactive && canvasContexts[layer.id] && imageElements[layer.id] && !imageElements[layer.id].classList.contains('hidden')) {
+                    if (!isPixelTransparent(event, canvasElements[layer.id], canvasContexts[layer.id])) {
+                        foundLayerId = layer.id;
+                        break;
+                    }
+                }
+            }
+
+            if (foundLayerId && foundLayerId !== activeLayerId) {
+                if (activeLayerId && imageElements[activeLayerId]) {
+                    imageElements[activeLayerId].classList.remove('glowing');
+                }
+                if (imageElements[foundLayerId]) {
+                    imageElements[foundLayerId].classList.add('glowing');
+                }
+                activeLayerId = foundLayerId;
+            } else if (!foundLayerId && activeLayerId) {
+                handleContainerMouseLeave();
+            }
+        }
+
+        function handleContainerMouseLeave() {
+            if (activeLayerId && imageElements[activeLayerId]) {
+                imageElements[activeLayerId].classList.remove('glowing');
+            }
+            activeLayerId = null;
+        }
+
+        function handleContainerClick(event) {
+            if (currentMode !== 'default') return;
+
+            let clickedLayerId = null;
+            for (let i = skeletonLayers.length - 1; i >= 0; i--) {
+                const layer = skeletonLayers[i];
+                if (layer.interactive && canvasContexts[layer.id] && imageElements[layer.id] && !imageElements[layer.id].classList.contains('hidden')) {
+                    if (!isPixelTransparent(event, canvasElements[layer.id], canvasContexts[layer.id])) {
+                        clickedLayerId = layer.id;
+                        break;
+                    }
+                }
+            }
+
+            if (clickedLayerId) {
+                const clickedLayer = skeletonLayers.find(l => l.id === clickedLayerId);
+                console.log(`Clicked on: ${clickedLayer.name}`);
+                showSidebar(clickedLayer);
+            }
+        }
+
+        function isPixelTransparent(event, canvas, ctx) {
+            if (!canvas || !ctx) return true;
+
+            const contRect = container.getBoundingClientRect();
+            const mouseX = event.clientX - contRect.left;
+            const mouseY = event.clientY - contRect.top;
+
+            if (mouseX < 0 || mouseX >= container.clientWidth || mouseY < 0 || mouseY >= container.clientHeight) {
+                return true;
+            }
+
+            const scaleX = canvas.width / canvas.clientWidth;
+            const scaleY = canvas.height / canvas.clientHeight;
+            const canvasX = Math.floor(mouseX * scaleX);
+            const canvasY = Math.floor(mouseY * scaleY);
+
+            if (canvasX < 0 || canvasX >= canvas.width || canvasY < 0 || canvasY >= canvas.height) {
+                return true;
+            }
+
+            try {
+                const pixelData = ctx.getImageData(canvasX, canvasY, 1, 1).data;
+                return pixelData[3] < 20;
+            } catch (e) {
+                return true;
+            }
+        }
+
+        function showError(message, isFatal = false) {
+            loadingIndicator.style.color = 'red';
+            loadingIndicator.innerHTML = `Error: ${message}`;
+            loadingIndicator.style.display = 'block';
+            console.error(message);
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
